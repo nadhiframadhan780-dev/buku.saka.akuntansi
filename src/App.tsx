@@ -32,7 +32,11 @@ import {
   ArrowRightLeft,
   CheckCircle2,
   X,
-  ListFilter
+  ListFilter,
+  FileSpreadsheet,
+  Menu,
+  MoreHorizontal,
+  AlertTriangle,
 } from 'lucide-react';
 
 import {
@@ -58,6 +62,12 @@ import {
 import { GeminiParser } from './components/GeminiParser';
 import { COAManager } from './components/COAManager';
 import { AccountingCalculators } from './components/AccountingCalculators';
+
+// Import New SAK Advanced Modules
+import AnalisisTransaksi from './components/AnalisisTransaksi';
+import KertasKerja from './components/KertasKerja';
+import JurnalPenutup from './components/JurnalPenutup';
+import { loadSheetJS, exportAllReportsToExcel } from './utils/excelExporter';
 
 // SEED TRANSACTIONS
 const INITIAL_TRANSACTIONS: JournalTransaction[] = [
@@ -185,8 +195,9 @@ const INITIAL_TRANSACTIONS: JournalTransaction[] = [
 
 export default function App() {
   // Navigation Menu active state
-  type MainTab = 'dashboard' | 'jurnal' | 'bukubesar' | 'neracasaldo' | 'laporan' | 'coa' | 'calculators' | 'settings';
+  type MainTab = 'dashboard' | 'jurnal' | 'bukubesar' | 'neracasaldo' | 'laporan' | 'analisistransaksi' | 'kertaskerja' | 'jurnalpenutup' | 'coa' | 'calculators' | 'settings';
   const [activeTab, setActiveTab] = useState<MainTab>('dashboard');
+  const [showMobileMore, setShowMobileMore] = useState(false);
 
   // Laporan sub tab
   type LaporanSubTab = 'labarugi' | 'ekuitas' | 'neraca' | 'aruskas';
@@ -214,8 +225,14 @@ export default function App() {
   const [transactions, setTransactions] = useState<JournalTransaction[]>([]);
   const [settings, setSettings] = useState<SystemSettings>({
     geminiApiKey: '',
-    companyName: 'CV Jasa Utama Teknologi',
-    period: 'Juni 2026'
+    companyName: 'PT Bintang Sejahtera',
+    period: 'Januari 2025',
+    namaPemilik: 'Tuan Budi',
+    alamatPerusahaan: 'Jl. Jenderal Sudirman No. 12, Jakarta',
+    tanggalAwal: '2025-01-01',
+    tanggalAkhir: '2025-01-31',
+    matauang: 'IDR',
+    saldoAwalKas: 0
   });
   const [showApiKey, setShowApiKey] = useState(false);
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
@@ -250,9 +267,25 @@ export default function App() {
 
     // 3. Settings
     const geminiApiKey = localStorage.getItem('geminiApiKey') || '';
-    const companyName = localStorage.getItem('namaPerusahaan') || 'CV Jasa Utama Teknologi';
-    const period = localStorage.getItem('periodelaporan') || 'Juni 2026';
-    setSettings({ geminiApiKey, companyName, period });
+    const companyName = localStorage.getItem('namaPerusahaan') || 'PT Bintang Sejahtera';
+    const period = localStorage.getItem('periodelaporan') || 'Januari 2025';
+    const namaPemilik = localStorage.getItem('namaPemilik') || 'Tuan Budi';
+    const alamatPerusahaan = localStorage.getItem('alamatPerusahaan') || 'Jl. Jenderal Sudirman No. 12, Jakarta';
+    const tanggalAwal = localStorage.getItem('tanggalAwal') || '2025-01-01';
+    const tanggalAkhir = localStorage.getItem('tanggalAkhir') || '2025-01-31';
+    const matauang = localStorage.getItem('matauang') || 'IDR';
+    const saldoAwalKas = Number(localStorage.getItem('saldoAwalKas') || '0');
+    setSettings({ 
+      geminiApiKey, 
+      companyName, 
+      period, 
+      namaPemilik, 
+      alamatPerusahaan, 
+      tanggalAwal, 
+      tanggalAkhir, 
+      matauang, 
+      saldoAwalKas 
+    });
 
     // 4. Dark Theme preference
     const localTheme = localStorage.getItem('themeMode') || 'light';
@@ -266,9 +299,15 @@ export default function App() {
 
   // Sync settings when modified
   const saveSettingsToLocal = (newSettings: SystemSettings) => {
-    localStorage.setItem('geminiApiKey', newSettings.geminiApiKey);
-    localStorage.setItem('namaPerusahaan', newSettings.companyName);
-    localStorage.setItem('periodelaporan', newSettings.period);
+    localStorage.setItem('geminiApiKey', newSettings.geminiApiKey || '');
+    localStorage.setItem('namaPerusahaan', newSettings.companyName || '');
+    localStorage.setItem('periodelaporan', newSettings.period || '');
+    localStorage.setItem('namaPemilik', newSettings.namaPemilik || 'Tuan Budi');
+    localStorage.setItem('alamatPerusahaan', newSettings.alamatPerusahaan || 'Jl. Jenderal Sudirman No. 12, Jakarta');
+    localStorage.setItem('tanggalAwal', newSettings.tanggalAwal || '2025-01-01');
+    localStorage.setItem('tanggalAkhir', newSettings.tanggalAkhir || '2025-01-31');
+    localStorage.setItem('matauang', newSettings.matauang || 'IDR');
+    localStorage.setItem('saldoAwalKas', String(newSettings.saldoAwalKas || 0));
     setSettings(newSettings);
     showToast('Pengaturan agensi berhasil disimpan', 'success');
   };
@@ -284,6 +323,36 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
     showToast(`Tema beralih ke Mode ${nextTheme === 'dark' ? 'Gelap' : 'Terang'}`, 'success');
+  };
+
+  // Parentheses-based SAK currency formatter
+  const formatRupiahParentheses = (val: number, isContra = false) => {
+    const symbol = settings.matauang === 'USD' ? '$' : 'Rp';
+    if (val < 0) {
+      return `(${symbol} ${formatRupiah(Math.abs(val))})`;
+    }
+    if (isContra && val !== 0) {
+      return `(${symbol} ${formatRupiah(val)})`;
+    }
+    return `${symbol} ${formatRupiah(val)}`;
+  };
+
+  // Lazy dynamic SheetJS runner for SAK Excel Exporter
+  const handleDownloadExcel = async () => {
+    try {
+      showToast('Menghubungkan ke server CDN SheetJS...', 'success');
+      const XLSX = await loadSheetJS();
+      if (!XLSX) {
+        showToast('Gagal memuat pustaka SheetJS. Silakan periksa koneksi internet Anda.', 'error');
+        return;
+      }
+      showToast('Menyusun lembaran kerja akuntansi SAK EP...', 'success');
+      exportAllReportsToExcel(XLSX, transactions, accounts, settings);
+      showToast('File laporan keuangan (.xlsx) berhasil diunduh!', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Gagal mengekspor berkas Excel: ' + err.message, 'error');
+    }
   };
 
   // State to manage accounts changes
@@ -529,10 +598,10 @@ export default function App() {
         </div>
       )}
 
-      {/* SIDEBAR NAVIGATION */}
-      <aside className="w-full md:w-64 shrink-0 bg-[#1e3a5f] dark:bg-slate-900 text-slate-200 border-r border-white/10 dark:border-slate-800 flex flex-col print:hidden transition-all duration-300">
-        <div className="p-6 border-b border-white/10 dark:border-slate-800 flex items-center justify-between gap-2.5">
-          <div>
+      {/* SIDEBAR NAVIGATION - Responsive: hidden on mobile, compact on tablet, full on desktop */}
+      <aside className="hidden md:flex md:w-20 lg:w-64 shrink-0 bg-[#1e3a5f] dark:bg-slate-900 text-slate-200 border-r border-white/10 dark:border-slate-800 flex-col print:hidden transition-all duration-300">
+        <div className="p-6 border-b border-white/10 dark:border-slate-800 flex items-center justify-between gap-1 lg:gap-2.5">
+          <div className="md:hidden lg:block">
             <h1 className="text-xl font-bold tracking-tight uppercase flex items-center gap-2 text-white">
               <span className="text-emerald-400 font-mono">◈</span> Buku Saka
             </h1>
@@ -540,17 +609,21 @@ export default function App() {
             <p className="text-[9px] text-emerald-300 font-mono mt-1 font-semibold tracking-wider">Karya: NADHIFNAR</p>
           </div>
           
+          <div className="hidden md:block lg:hidden text-center mx-auto">
+            <span className="text-xl font-bold text-emerald-400 font-mono" title="Buku Saka">◈</span>
+          </div>
+
           <button
             onClick={toggleTheme}
-            className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-colors cursor-pointer md:hidden lg:block"
             title="Sembunyikan / Tampilkan mode gelap"
           >
             {themeMode === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-amber-400" />}
           </button>
         </div>
 
-        {/* Company profile miniature */}
-        <div className="px-6 py-4 bg-black/10 border-b border-white/5 text-xs text-slate-300">
+        {/* Company profile miniature - hidden on tablet rail */}
+        <div className="px-6 py-4 bg-black/10 border-b border-white/5 text-xs text-slate-300 md:hidden lg:block">
           <p className="text-white/40 font-bold uppercase tracking-widest text-[9px]">Badan Usaha Aktif</p>
           <p className="text-white font-semibold truncate mt-0.5">{settings.companyName}</p>
           <p className="text-emerald-400/95 font-mono text-[10px] mt-0.5">Periode: {settings.period}</p>
@@ -558,7 +631,7 @@ export default function App() {
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {/* Section: Core Accounting */}
-          <div className="text-[10px] text-white/45 dark:text-slate-400 uppercase font-black px-3.5 py-1.5 tracking-wider font-mono">Core Accounting</div>
+          <div className="text-[10px] text-white/45 dark:text-slate-400 uppercase font-black px-3.5 py-1.5 tracking-wider font-mono md:hidden lg:block">Core Accounting</div>
           
           <button
             onClick={() => setActiveTab('dashboard')}
@@ -568,8 +641,8 @@ export default function App() {
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <Grid className="w-4 h-4 text-white/60" />
-            Beranda & AI Parser
+            <Grid className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Beranda &amp; AI Parser</span>
           </button>
 
           <button
@@ -580,10 +653,10 @@ export default function App() {
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <Book className="w-4 h-4 text-white/60" />
-            Jurnal Umum
+            <Book className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Jurnal Umum</span>
             {transactions.length > 0 && (
-              <span className="ml-auto bg-white/15 text-white px-1.5 py-0.5 rounded text-[9px] font-mono">
+              <span className="ml-auto bg-white/15 text-white px-1.5 py-0.5 rounded text-[9px] font-mono md:hidden lg:inline-block">
                 {transactions.length}
               </span>
             )}
@@ -597,8 +670,8 @@ export default function App() {
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <Layers className="w-4 h-4 text-white/60" />
-            Buku Besar (Ledger)
+            <Layers className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Buku Besar (Ledger)</span>
           </button>
 
           <button
@@ -609,17 +682,17 @@ export default function App() {
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <ArrowRightLeft className="w-4 h-4 text-white/60" />
-            Neraca Saldo
+            <ArrowRightLeft className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Neraca Saldo</span>
             {trialBalance.isBalanced ? (
-              <span className="ml-auto w-2 h-2 rounded-full bg-emerald-400" title="Neraca Berimbang" />
+              <span className="ml-auto w-2 h-2 rounded-full bg-emerald-400 md:hidden lg:block" title="Neraca Berimbang" />
             ) : (
-              <span className="ml-auto w-2 h-2 rounded-full bg-rose-400 animate-pulse" title="Neraca Tidak Seimbang" />
+              <span className="ml-auto w-2 h-2 rounded-full bg-rose-400 animate-pulse md:hidden lg:block" title="Neraca Tidak Seimbang" />
             )}
           </button>
 
           {/* Section: Laporan SAK */}
-          <div className="text-[10px] text-white/45 dark:text-slate-400 uppercase font-black px-3.5 py-1.5 mt-4 tracking-wider font-mono">Laporan SAK</div>
+          <div className="text-[10px] text-white/45 dark:text-slate-400 uppercase font-black px-3.5 py-1.5 mt-4 tracking-wider font-mono md:hidden lg:block">Laporan SAK</div>
 
           <button
             onClick={() => setActiveTab('laporan')}
@@ -629,12 +702,51 @@ export default function App() {
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <FileText className="w-4 h-4 text-white/60" />
-            Laporan Keuangan SAK
+            <FileText className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Laporan Keuangan SAK</span>
+          </button>
+
+          {/* Section: Siklus Lanjutan SAK */}
+          <div className="text-[10px] text-white/45 dark:text-slate-400 uppercase font-black px-3.5 py-1.5 mt-4 tracking-wider font-mono md:hidden lg:block">Siklus Lanjutan SAK</div>
+
+          <button
+            onClick={() => setActiveTab('analisistransaksi')}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide text-left transition-all cursor-pointer ${
+              activeTab === 'analisistransaksi'
+                ? 'bg-white/10 text-white font-bold border-l-2 border-emerald-400'
+                : 'text-white/70 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <PieChart className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Analisis Transaksi</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('kertaskerja')}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide text-left transition-all cursor-pointer ${
+              activeTab === 'kertaskerja'
+                ? 'bg-white/10 text-white font-bold border-l-2 border-emerald-400'
+                : 'text-white/70 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Kertas Kerja (Worksheet)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('jurnalpenutup')}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold tracking-wide text-left transition-all cursor-pointer ${
+              activeTab === 'jurnalpenutup'
+                ? 'bg-white/10 text-white font-bold border-l-2 border-emerald-400'
+                : 'text-white/70 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <FileCheck className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Jurnal Penutup SAK</span>
           </button>
 
           {/* Section: Tools & Config */}
-          <div className="text-[10px] text-white/45 dark:text-slate-400 uppercase font-black px-3.5 py-1.5 mt-4 tracking-wider font-mono">Tools & Config</div>
+          <div className="text-[10px] text-white/45 dark:text-slate-400 uppercase font-black px-3.5 py-1.5 mt-4 tracking-wider font-mono md:hidden lg:block">Tools &amp; Config</div>
 
           <button
             onClick={() => setActiveTab('coa')}
@@ -644,8 +756,8 @@ export default function App() {
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <BookOpen className="w-4 h-4 text-white/60" />
-            Daftar Perkiraan (COA)
+            <BookOpen className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Daftar Perkiraan (COA)</span>
           </button>
 
           <button
@@ -656,8 +768,8 @@ export default function App() {
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <Calculator className="w-4 h-4 text-white/60" />
-            Rumus & Kalkulator
+            <Calculator className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Rumus &amp; Kalkulator</span>
           </button>
 
           <button
@@ -668,13 +780,13 @@ export default function App() {
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <Settings className="w-4 h-4 text-white/60" />
-            Pengaturan (Settings)
+            <Settings className="w-4 h-4 text-white/60 mx-auto lg:mx-0" />
+            <span className="md:hidden lg:inline">Pengaturan (Settings)</span>
           </button>
         </nav>
 
         {/* Equation Balance widget at bottom on sidebar */}
-        <div className="p-4 bg-black/20 border-t border-white/10 mt-auto">
+        <div className="p-4 bg-black/20 border-t border-white/10 mt-auto md:hidden lg:block">
           <div className="flex items-center justify-between text-[11px] mb-2 font-semibold">
             <span className="text-white/60">Persamaan Dasar</span>
             {trialBalance.isBalanced ? (
@@ -728,6 +840,15 @@ export default function App() {
                 Cetak Laporan
               </button>
             )}
+
+            <button
+              onClick={handleDownloadExcel}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              title="Unduh seluruh laporan keuangan SAK ke dalam satu file Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-white" />
+              Unduh Excel SAK
+            </button>
             
             <button
               onClick={() => {
@@ -744,7 +865,7 @@ export default function App() {
         </header>
 
         {/* CONTAINER VIEW FOR SCANNED OR WRITTEN PAGES */}
-        <div className="p-6 md:p-8 flex-1">
+        <div className="p-6 pb-24 md:p-8 flex-1">
           
           {/* ======================================================
               TAB 1: DASHBOARD & AI PARSER
@@ -1368,21 +1489,21 @@ export default function App() {
                   <div className="space-y-6">
                     <div>
                       {/* Revenues */}
-                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2">1. PENDAPATAN JASA URUSAN</span>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2">1. PENDAPATAN JASA UTAMA &amp; USAHA</span>
                       <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-2 font-mono text-xs">
                         {incomeStatement.revenues.map(rev => (
                           <div key={rev.account.code} className="flex justify-between p-1 hover:bg-slate-50/50 dark:hover:bg-slate-850/30">
                             <span className="font-sans font-semibold text-slate-700 dark:text-slate-300">[{rev.account.code}] {rev.account.name}</span>
-                            <span>{formatRupiah(rev.amount)}</span>
+                            <span>{formatRupiahParentheses(rev.amount)}</span>
                           </div>
                         ))}
                         {incomeStatement.revenues.length === 0 && (
                           <div className="text-slate-400 p-1 font-sans italic">Pendapatan nihil</div>
                         )}
                         <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 font-sans font-extrabold text-xs pt-2">
-                          <span>TOTAL PENDAPATAN</span>
+                          <span>TOTAL PENDAPATAN JASA &amp; OPERASIONAL</span>
                           <span className="font-mono text-slate-800 dark:text-white underline decoration-double">
-                            {formatRupiah(incomeStatement.totalRevenue)}
+                            {formatRupiahParentheses(incomeStatement.totalRevenue)}
                           </span>
                         </div>
                       </div>
@@ -1395,16 +1516,16 @@ export default function App() {
                         {incomeStatement.expenses.map(exp => (
                           <div key={exp.account.code} className="flex justify-between p-1 hover:bg-slate-50/50 dark:hover:bg-slate-850/30">
                             <span className="font-sans font-semibold text-slate-700 dark:text-slate-300">[{exp.account.code}] {exp.account.name}</span>
-                            <span>({formatRupiah(exp.amount)})</span>
+                            <span>{formatRupiahParentheses(-exp.amount, true)}</span>
                           </div>
                         ))}
                         {incomeStatement.expenses.length === 0 && (
                           <div className="text-slate-400 p-1 font-sans italic">Beban operasional nihil</div>
                         )}
                         <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 font-sans font-extrabold text-xs pt-2">
-                          <span>TOTAL BEBAN OPERASIONAL</span>
+                          <span>TOTAL BEBAN OPERASIONAL RESIDUAL</span>
                           <span className="font-mono text-slate-800 dark:text-white underline">
-                            ({formatRupiah(incomeStatement.totalExpense)})
+                            {formatRupiahParentheses(-incomeStatement.totalExpense)}
                           </span>
                         </div>
                       </div>
@@ -1413,8 +1534,8 @@ export default function App() {
                     {/* Net Income Summary */}
                     <div className="border-t-2 border-slate-400 dark:border-slate-700 pt-4 mt-8 flex justify-between font-sans text-sm font-black uppercase text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-950 p-3.5 rounded-xl">
                       <span>Laba (Rugi) Bersih Periode Berjalan</span>
-                      <span className={`font-mono text-lg ${incomeStatement.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
-                        {formatRupiah(incomeStatement.netProfit)}
+                      <span className={`font-mono text-lg ${incomeStatement.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-450'}`}>
+                        {formatRupiahParentheses(incomeStatement.netProfit)}
                       </span>
                     </div>
                   </div>
@@ -1424,23 +1545,30 @@ export default function App() {
                 {activeLaporanTab === 'ekuitas' && (
                   <div className="space-y-4 font-mono text-xs">
                     <div className="flex justify-between p-1 hover:bg-slate-50 dark:hover:bg-slate-800">
-                      <span className="font-sans font-semibold text-slate-700 dark:text-slate-350">Modal Awal Pemilik (Perkiraan No 301)</span>
-                      <span>{formatRupiah(equityStatement.initialCapital)}</span>
+                      <span className="font-sans font-semibold text-slate-700 dark:text-slate-350">Modal Pemilik, {settings.namaPemilik || 'Tuan Budi'} (Awal)</span>
+                      <span>{formatRupiahParentheses(equityStatement.initialCapital)}</span>
                     </div>
 
                     <div className="flex justify-between p-1 hover:bg-slate-50 dark:hover:bg-slate-800">
-                      <span className="font-sans font-semibold text-slate-700 dark:text-slate-350">Ditambah: Laba Bersih Periode Berjalan (Accral)</span>
-                      <span className="text-emerald-600 font-bold">+{formatRupiah(equityStatement.netProfit)}</span>
+                      <span className="font-sans font-semibold text-slate-700 dark:text-slate-350">
+                        {equityStatement.netProfit >= 0 
+                          ? 'Tambah: Laba Bersih Periode Berjalan' 
+                          : 'Kurang: Rugi Bersih Periode Berjalan'
+                        }
+                      </span>
+                      <span className={equityStatement.netProfit >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                        {equityStatement.netProfit >= 0 ? '+' : ''}{formatRupiahParentheses(equityStatement.netProfit)}
+                      </span>
                     </div>
 
                     <div className="flex justify-between p-1 hover:bg-slate-50 dark:hover:bg-slate-800">
-                      <span className="font-sans font-semibold text-slate-700 dark:text-slate-350">Dikurangi: Penarikan Prive Pemilik (Perkiraan No 302)</span>
-                      <span className="text-rose-500 font-bold">({formatRupiah(equityStatement.drawings)})</span>
+                      <span className="font-sans font-semibold text-slate-700 dark:text-slate-350">Kurang: Prive, {settings.namaPemilik || 'Tuan Budi'}</span>
+                      <span className="text-rose-500 font-bold">{formatRupiahParentheses(-equityStatement.drawings, true)}</span>
                     </div>
 
                     <div className="border-t-2 border-slate-300 dark:border-slate-700 pt-4 mt-8 flex justify-between font-sans text-sm font-black uppercase text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-950 p-4 rounded-xl">
-                      <span>Modal Pemilik Akhir Periode</span>
-                      <span className="font-mono text-base">{formatRupiah(equityStatement.endingCapital)}</span>
+                      <span>Modal Pemilik, {settings.namaPemilik || 'Tuan Budi'} (Akhir)</span>
+                      <span className="font-mono text-base">{formatRupiahParentheses(equityStatement.endingCapital)}</span>
                     </div>
                   </div>
                 )}
@@ -1454,86 +1582,86 @@ export default function App() {
                       
                       <div>
                         {/* Current assets */}
-                        <span className="text-[10px] font-black text-slate-400 block mb-1">1. ASET LANCAR</span>
+                        <span className="text-[10px] font-black text-slate-400 block mb-1">1. ASET LANCAR (CURRENT ASSETS)</span>
                         <div className="space-y-1.5 font-mono text-xs">
                           {balanceSheet.assetsLancar.map(item => (
                             <div key={item.account.code} className="flex justify-between p-0.5">
                               <span className="font-sans text-slate-700 dark:text-slate-300 capitalize">[{item.account.code}] {item.account.name}</span>
-                              <span>{formatRupiah(item.amount)}</span>
+                              <span>{formatRupiahParentheses(item.amount)}</span>
                             </div>
                           ))}
                           <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 font-sans font-bold text-xs pt-1.5">
-                            <span>Subtotal Aset Lancar</span>
-                            <span>{formatRupiah(balanceSheet.totalAssetsLancar)}</span>
+                            <span>Subtotal Aset Lancar Berjalan</span>
+                            <span>{formatRupiahParentheses(balanceSheet.totalAssetsLancar)}</span>
                           </div>
                         </div>
                       </div>
 
                       <div className="pt-2">
                         {/* Fixed assets */}
-                        <span className="text-[10px] font-black text-slate-400 block mb-1">2. ASET TETAP (TIDAK LANCAR)</span>
+                        <span className="text-[10px] font-black text-slate-400 block mb-1">2. ASET TETAP &amp; TIDAK LANCAR</span>
                         <div className="space-y-1.5 font-mono text-xs">
                           {balanceSheet.assetsTetap.map(item => (
                             <div key={item.account.code} className="flex justify-between p-0.5">
                               <span className="font-sans text-slate-700 dark:text-slate-300 capitalize">[{item.account.code}] {item.account.name}</span>
                               <span className={item.account.isContra ? 'text-rose-500 font-bold' : ''}>
-                                {item.account.isContra ? `(${formatRupiah(item.amount)})` : formatRupiah(item.amount)}
+                                {formatRupiahParentheses(item.amount, item.account.isContra)}
                               </span>
                             </div>
                           ))}
                           <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 font-sans font-bold text-xs pt-1.5">
-                            <span>Subtotal Aset Tetap Neto</span>
-                            <span>{formatRupiah(balanceSheet.totalAssetsTetap)}</span>
+                            <span>Subtotal Keadaan Neto Aset Tetap</span>
+                            <span>{formatRupiahParentheses(balanceSheet.totalAssetsTetap)}</span>
                           </div>
                         </div>
                       </div>
 
                       <div className="pt-4 border-t-2 border-slate-300 dark:border-slate-700 flex justify-between font-sans text-sm font-black uppercase text-slate-900 dark:text-white bg-blue-50/50 dark:bg-blue-950/20 p-2.5 rounded-lg">
-                        <span>TOTAL ASET</span>
-                        <span className="font-mono">{formatRupiah(balanceSheet.totalAssets)}</span>
+                        <span>TOTAL SELURUH ASET</span>
+                        <span className="font-mono">{formatRupiahParentheses(balanceSheet.totalAssets)}</span>
                       </div>
                     </div>
 
                     {/* Right side column: LIABILITAS & EKUITAS */}
                     <div className="space-y-6">
-                      <h4 className="text-sm font-black text-amber-600 uppercase tracking-widest border-b pb-1.5 border-slate-100 dark:border-slate-800">B. LIABILITAS & EKUITAS</h4>
+                      <h4 className="text-sm font-black text-amber-600 uppercase tracking-widest border-b pb-1.5 border-slate-100 dark:border-slate-800">B. LIABILITAS &amp; EKUITAS</h4>
                       
                       <div>
                         {/* Short term liab */}
-                        <span className="text-[10px] font-black text-slate-400 block mb-1">1. KEWAJIBAN JANGKA PENDEK</span>
+                        <span className="text-[10px] font-black text-slate-400 block mb-1">1. LIABILITAS JANGKA PENDEK</span>
                         <div className="space-y-1.5 font-mono text-xs">
                           {balanceSheet.liabilitiesShort.map(item => (
                             <div key={item.account.code} className="flex justify-between p-0.5">
                               <span className="font-sans text-slate-700 dark:text-slate-300 capitalize">[{item.account.code}] {item.account.name}</span>
-                              <span>{formatRupiah(item.amount)}</span>
+                              <span>{formatRupiahParentheses(item.amount)}</span>
                             </div>
                           ))}
                           {balanceSheet.liabilitiesShort.length === 0 && (
-                            <div className="text-slate-400 font-sans italic p-0.5">Kewajiban jangka pendek nihil</div>
+                            <div className="text-slate-400 font-sans italic p-0.5">Liabilitas jangka pendek nihil</div>
                           )}
                           <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 font-sans font-bold text-xs pt-1.5">
-                            <span>Subtotal Jangka Pendek</span>
-                            <span>{formatRupiah(balanceSheet.totalLiabilitiesShort)}</span>
+                            <span>Subtotal Jangka Pendek Utama</span>
+                            <span>{formatRupiahParentheses(balanceSheet.totalLiabilitiesShort)}</span>
                           </div>
                         </div>
                       </div>
 
                       <div className="pt-2">
                         {/* Long term liab */}
-                        <span className="text-[10px] font-black text-slate-400 block mb-1">2. KEWAJIBAN JANGKA PANJANG</span>
+                        <span className="text-[10px] font-black text-slate-400 block mb-1">2. LIABILITAS JANGKA PANJANG (LONG TERM)</span>
                         <div className="space-y-1.5 font-mono text-xs">
                           {balanceSheet.liabilitiesLong.map(item => (
                             <div key={item.account.code} className="flex justify-between p-0.5">
                               <span className="font-sans text-slate-700 dark:text-slate-300 capitalize">[{item.account.code}] {item.account.name}</span>
-                              <span>{formatRupiah(item.amount)}</span>
+                              <span>{formatRupiahParentheses(item.amount)}</span>
                             </div>
                           ))}
                           {balanceSheet.liabilitiesLong.length === 0 && (
                             <div className="text-slate-400 font-sans italic p-0.5">Kewajiban jangka panjang nihil</div>
                           )}
                           <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 font-sans font-bold text-xs pt-1.5">
-                            <span>Subtotal Jangka Panjang</span>
-                            <span>{formatRupiah(balanceSheet.totalLiabilitiesLong)}</span>
+                            <span>Subtotal Jangka Panjang Neto</span>
+                            <span>{formatRupiahParentheses(balanceSheet.totalLiabilitiesLong)}</span>
                           </div>
                         </div>
                       </div>
@@ -1543,29 +1671,37 @@ export default function App() {
                         <span className="text-[10px] font-black text-slate-400 block mb-1">3. EKUITAS ENTITAS</span>
                         <div className="space-y-1.5 font-mono text-xs">
                           <div className="flex justify-between p-0.5 font-bold">
-                            <span className="font-sans text-slate-700 dark:text-slate-300 capitalize">Modal Pemilik Akhir Periode</span>
-                            <span>{formatRupiah(balanceSheet.capital)}</span>
+                            <span className="font-sans text-slate-700 dark:text-slate-300 capitalize">Modal Akhir, {settings.namaPemilik || 'Tuan Budi'}</span>
+                            <span>{formatRupiahParentheses(balanceSheet.capital)}</span>
                           </div>
                         </div>
                       </div>
 
                       <div className="pt-4 border-t-2 border-slate-300 dark:border-slate-700 flex justify-between font-sans text-sm font-black uppercase text-slate-900 dark:text-white bg-amber-50/50 dark:bg-amber-950/20 p-2.5 rounded-lg">
-                        <span>TOTAL LIABILITAS & EKUITAS</span>
-                        <span className="font-mono">{formatRupiah(balanceSheet.totalLiabilities + balanceSheet.totalEquity)}</span>
+                        <span>TOTAL LIABILITAS &amp; EKUITAS</span>
+                        <span className="font-mono">{formatRupiahParentheses(balanceSheet.totalLiabilities + balanceSheet.totalEquity)}</span>
                       </div>
                     </div>
 
                     {/* Footer Balance diagnosis */}
-                    <div className="md:col-span-2 pt-6 border-t border-slate-150 dark:border-slate-800/80 flex justify-center items-center">
+                    <div className="md:col-span-2 pt-6 border-t border-slate-150 dark:border-slate-800/80 flex flex-col items-center justify-center gap-2">
                       {balanceSheet.isBalanced ? (
-                        <div className="px-5 py-2.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 text-emerald-800 dark:text-emerald-400 text-xs font-black rounded-xl flex items-center gap-2">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                          DIAGNOSTIK: NERACA SEIMBANG (BALANCE)
+                        <div className="px-5 py-3.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 text-emerald-800 dark:text-emerald-400 text-xs font-black rounded-xl flex items-center gap-2 max-w-xl text-center">
+                          <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <div>
+                            <span className="block font-bold">DIAGNOSTIK: NERACA SEIMBANG ✓</span>
+                            <span className="block font-normal text-[11px] text-slate-500 mt-0.5">Sempurna! Persamaan akrual aset berimbang kokoh dengan kewajiban dan ekuitas bersih (Selisih: Rp 0).</span>
+                          </div>
                         </div>
                       ) : (
-                        <div className="px-5 py-2.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-250 text-rose-800 dark:text-rose-400 text-xs font-black rounded-xl flex items-center gap-2 animate-bounce">
-                          <X className="w-5 h-5 text-rose-600 dark:text-rose-400" />
-                          DIAGNOSTIK: NERACA TIDAK SEIMBANG! Selisih {formatRupiah(balanceSheet.difference)}
+                        <div className="px-5 py-3.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-250 text-rose-800 dark:text-rose-400 text-xs font-black rounded-xl flex items-start gap-2 max-w-xl text-left">
+                          <X className="w-5 h-5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                          <div>
+                            <span className="block font-bold">DIAGNOSTIK: NERACA TIDAK SEIMBANG! Selisih {formatRupiahParentheses(balanceSheet.difference)}</span>
+                            <span className="block font-normal text-[11px] text-rose-700 dark:text-rose-350 mt-1 leading-relaxed">
+                              Nilai total aset tidak sesuai dengan kewajiban ditambah modal pemilik. Silakan periksa entri penyesuaian Anda di tab Kertas Kerja, periksa penyesuaian beban penyusutan, atau pastikan Jurnal Penutup belum mendistorsi saldo berjalan.
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1787,6 +1923,55 @@ export default function App() {
           )}
 
           {/* ======================================================
+              TAB: ANALISIS TRANSAKSI
+              ====================================================== */}
+          {activeTab === 'analisistransaksi' && (
+            <div className="space-y-6 animate-fade-in print:hidden">
+              <AnalisisTransaksi
+                transactions={transactions}
+                accounts={accounts}
+              />
+            </div>
+          )}
+
+          {/* ======================================================
+              TAB: KERTAS KERJA (WORKSHEET)
+              ====================================================== */}
+          {activeTab === 'kertaskerja' && (
+            <div className="space-y-6 animate-fade-in print:hidden">
+              <KertasKerja
+                transactions={transactions}
+                accounts={accounts}
+                onAddTransaction={(newTx) => {
+                  const updated = [...transactions, newTx];
+                  setTransactions(updated);
+                  localStorage.setItem('journalTransactions', JSON.stringify(updated));
+                  showToast(`Jurnal Penyesuaian ${newTx.refNo} berhasil direkam ke sistem.`, 'success');
+                }}
+              />
+            </div>
+          )}
+
+          {/* ======================================================
+              TAB: JURNAL PENUTUP
+              ====================================================== */}
+          {activeTab === 'jurnalpenutup' && (
+            <div className="space-y-6 animate-fade-in print:hidden">
+              <JurnalPenutup
+                transactions={transactions}
+                accounts={accounts}
+                settings={settings}
+                onAddTransactionsBulk={(newTxs) => {
+                  const updated = [...transactions, ...newTxs];
+                  setTransactions(updated);
+                  localStorage.setItem('journalTransactions', JSON.stringify(updated));
+                  showToast(`${newTxs.length} Jurnal Penutup berhasil diposting ke Buku Umum.`, 'success');
+                }}
+              />
+            </div>
+          )}
+
+          {/* ======================================================
               TAB 6: CHART OF ACCOUNTS (COA)
               ====================================================== */}
           {activeTab === 'coa' && (
@@ -1911,13 +2096,13 @@ export default function App() {
         </div>
 
         {/* FOOTER / STATUS BAR */}
-        <footer className="h-11 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between px-8 shrink-0 print:hidden transition-colors">
+        <footer className="h-11 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between px-8 shrink-0 print:hidden transition-colors md:mb-0 mb-11">
           <div className="flex gap-4 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> 
               Sistem Aktif (Luring)
             </span>
-            <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+            <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-sans">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> 
               Gemini AI Connected
             </span>
@@ -1928,6 +2113,186 @@ export default function App() {
             <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-sans">Pembuat: NADHIFNAR</span>
           </div>
         </footer>
+
+        {/* MOBILE BOTTOM NAVIGATION BAR */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-around items-center py-2 px-1 print:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.06)] text-slate-600 dark:text-slate-300">
+          
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex flex-col items-center justify-center p-1 flex-1 cursor-pointer transition-colors ${activeTab === 'dashboard' ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400 dark:text-slate-500'}`}
+          >
+            <Grid className="w-4.5 h-4.5 mb-1" />
+            <span className="text-[10px] font-medium tracking-tight">Beranda</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('jurnal')}
+            className={`flex flex-col items-center justify-center p-1 flex-1 cursor-pointer transition-colors ${activeTab === 'jurnal' ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400 dark:text-slate-500'}`}
+          >
+            <Book className="w-4.5 h-4.5 mb-1" />
+            <span className="text-[10px] font-medium tracking-tight">Jurnal</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('kertaskerja')}
+            className={`flex flex-col items-center justify-center p-1 flex-1 cursor-pointer transition-colors ${activeTab === 'kertaskerja' ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400 dark:text-slate-500'}`}
+          >
+            <FileSpreadsheet className="w-4.5 h-4.5 mb-1" />
+            <span className="text-[10px] font-medium tracking-tight">Kerja</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('laporan')}
+            className={`flex flex-col items-center justify-center p-1 flex-1 cursor-pointer transition-colors ${activeTab === 'laporan' ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400 dark:text-slate-500'}`}
+          >
+            <FileText className="w-4.5 h-4.5 mb-1" />
+            <span className="text-[10px] font-medium tracking-tight">Laporan</span>
+          </button>
+
+          <button
+            onClick={() => setShowMobileMore(true)}
+            className="flex flex-col items-center justify-center p-1 flex-1 text-slate-400 dark:text-slate-500 cursor-pointer hover:text-blue-500 transition-colors"
+          >
+            <MoreHorizontal className="w-4.5 h-4.5 mb-1" />
+            <span className="text-[10px] font-medium tracking-tight">Lainnya</span>
+          </button>
+        </div>
+
+        {/* MOBILE MORE MENU SHEET DRAWER OVERLAY */}
+        {showMobileMore && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center md:hidden print:hidden animate-fade-in">
+            {/* Backdrop dark shadow with state change on tap */}
+            <div 
+              onClick={() => setShowMobileMore(false)}
+              className="fixed inset-0 bg-black/65 dark:bg-black/85 backdrop-blur-sm" 
+            />
+            {/* Slide up content drawer container */}
+            <div className="relative w-full max-w-md bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 rounded-t-[2.5rem] p-6 z-10 shadow-2xl overflow-y-auto max-h-[80vh] transition-transform duration-300">
+              
+              {/* Drawer header drag indicator line */}
+              <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-4" onClick={() => setShowMobileMore(false)} />
+
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="font-sans font-black text-slate-800 dark:text-white text-sm uppercase tracking-wider">SIKLUS BUKU SAKA</h3>
+                  <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">Pembuat: <span className="font-extrabold text-blue-600">NADHIFNAR</span></p>
+                </div>
+                <button 
+                  onClick={() => setShowMobileMore(false)}
+                  className="p-1 text-slate-450 hover:text-slate-650 dark:hover:text-slate-250 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Grid of full routes inside Drawer */}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                
+                <button
+                  onClick={() => { setActiveTab('dashboard'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'dashboard' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <Grid className="w-4.5 h-4.5 text-indigo-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Dashboard</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('jurnal'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'jurnal' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <Book className="w-4.5 h-4.5 text-indigo-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Jurnal Umum</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('bukubesar'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'bukubesar' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <Layers className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Buku Besar</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('neracasaldo'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'neracasaldo' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <ArrowRightLeft className="w-4.5 h-4.5 text-violet-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Neraca Saldo</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('laporan'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'laporan' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <FileText className="w-4.5 h-4.5 text-sky-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Laporan SAK</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('analisistransaksi'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'analisistransaksi' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <PieChart className="w-4.5 h-4.5 text-orange-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Analitis</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('kertaskerja'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'kertaskerja' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <FileSpreadsheet className="w-4.5 h-4.5 text-teal-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Kertas Kerja</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('jurnalpenutup'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'jurnalpenutup' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <FileCheck className="w-4.5 h-4.5 text-amber-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Penutupan</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('coa'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'coa' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <BookOpen className="w-4.5 h-4.5 text-purple-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Daftar COA</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('settings'); setShowMobileMore(false); }}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${activeTab === 'settings' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-150 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350'}`}
+                >
+                  <Settings className="w-4.5 h-4.5 text-slate-500 shrink-0" />
+                  <span className="text-xs font-bold font-sans">Setelan</span>
+                </button>
+
+              </div>
+
+              {/* Toggle theme inside menu sheet too */}
+              <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950 px-4 py-3 rounded-xl border border-slate-150 dark:border-slate-850">
+                <span className="text-xs font-extrabold text-slate-750 dark:text-slate-400 flex items-center gap-1.5 font-sans">
+                  {themeMode === 'light' ? <Moon className="w-4.5 h-4.5 text-slate-500" /> : <Sun className="w-4.5 h-4.5 text-amber-500" />} Mode Aplikasi
+                </span>
+                <button
+                  onClick={() => { toggleTheme(); }}
+                  className="px-3 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-[10px] font-black cursor-pointer"
+                >
+                  Tukar Tema ({themeMode === 'light' ? 'Gelap' : 'Terang'})
+                </button>
+              </div>
+
+              {/* Close Button beneath */}
+              <button
+                onClick={() => setShowMobileMore(false)}
+                className="w-full mt-4 py-3 bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 rounded-xl text-xs font-black cursor-pointer text-center tracking-wide"
+              >
+                KEMBALI KE APLIKASI
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

@@ -27,6 +27,12 @@ export interface SystemSettings {
   geminiApiKey: string;
   companyName: string;
   period: string;          // e.g., "Juni 2026", "Tahun 2026"
+  namaPemilik?: string;
+  alamatPerusahaan?: string;
+  tanggalAwal?: string;
+  tanggalAkhir?: string;
+  matauang?: string;
+  saldoAwalKas?: number;
 }
 
 // Depreciation Calculation Models

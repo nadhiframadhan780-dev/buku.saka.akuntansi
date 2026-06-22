@@ -2,43 +2,71 @@ import { Account, JournalTransaction, JournalEntryItem } from './types';
 
 // Default Chart of Accounts pre-filled
 export const DEFAULT_ACCOUNTS: Account[] = [
-  // Aset Lancar
+  // ASET (1xx)
   { code: '101', name: 'Kas', category: 'Aset', normalBalance: 'D', isContra: false },
-  { code: '102', name: 'Bank', category: 'Aset', normalBalance: 'D', isContra: false },
-  { code: '103', name: 'Piutang Usaha', category: 'Aset', normalBalance: 'D', isContra: false },
-  { code: '104', name: 'Perlengkapan', category: 'Aset', normalBalance: 'D', isContra: false },
-  { code: '105', name: 'Persediaan Barang Dagang', category: 'Aset', normalBalance: 'D', isContra: false },
-  { code: '106', name: 'Sewa Dibayar di Muka', category: 'Aset', normalBalance: 'D', isContra: false },
-  // Aset Tidak Lancar
-  { code: '151', name: 'Peralatan', category: 'Aset', normalBalance: 'D', isContra: false },
-  { code: '152', name: 'Akumulasi Penyusutan Peralatan', category: 'Aset', normalBalance: 'K', isContra: true },
-  { code: '153', name: 'Gedung', category: 'Aset', normalBalance: 'D', isContra: false },
-  { code: '154', name: 'Akumulasi Penyusutan Gedung', category: 'Aset', normalBalance: 'K', isContra: true },
-  { code: '155', name: 'Tanah', category: 'Aset', normalBalance: 'D', isContra: false },
-  // Liabilitas Jangka Pendek
+  { code: '102', name: 'Kas Kecil (Petty Cash)', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '103', name: 'Kas di Bank', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '111', name: 'Piutang Usaha', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '112', name: 'Piutang Wesel', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '113', name: 'Piutang Lain-lain', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '114', name: 'Perlengkapan Kantor', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '115', name: 'Perlengkapan Toko', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '116', name: 'Persediaan Barang Dagang', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '117', name: 'Sewa Dibayar Dimuka', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '118', name: 'Asuransi Dibayar Dimuka', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '119', name: 'Iklan Dibayar Dimuka', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '151', name: 'Tanah', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '152', name: 'Gedung / Bangunan', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '153', name: 'Akumulasi Penyusutan Gedung', category: 'Aset', normalBalance: 'K', isContra: true },
+  { code: '154', name: 'Peralatan Kantor', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '155', name: 'Akumulasi Penyusutan Peralatan Kantor', category: 'Aset', normalBalance: 'K', isContra: true },
+  { code: '156', name: 'Kendaraan', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '157', name: 'Akumulasi Penyusutan Kendaraan', category: 'Aset', normalBalance: 'K', isContra: true },
+  { code: '158', name: 'Mesin', category: 'Aset', normalBalance: 'D', isContra: false },
+  { code: '159', name: 'Akumulasi Penyusutan Mesin', category: 'Aset', normalBalance: 'K', isContra: true },
+
+  // LIABILITAS (2xx)
   { code: '201', name: 'Utang Usaha', category: 'Liabilitas', normalBalance: 'K', isContra: false },
-  { code: '202', name: 'Utang Gaji', category: 'Liabilitas', normalBalance: 'K', isContra: false },
-  { code: '203', name: 'Pendapatan Diterima di Muka', category: 'Liabilitas', normalBalance: 'K', isContra: false },
-  // Liabilitas Jangka Panjang
-  { code: '251', name: 'Utang Bank Jangka Panjang', category: 'Liabilitas', normalBalance: 'K', isContra: false },
-  // Ekuitas
+  { code: '202', name: 'Utang Wesel', category: 'Liabilitas', normalBalance: 'K', isContra: false },
+  { code: '203', name: 'Utang Gaji', category: 'Liabilitas', normalBalance: 'K', isContra: false },
+  { code: '204', name: 'Utang Sewa', category: 'Liabilitas', normalBalance: 'K', isContra: false },
+  { code: '205', name: 'Utang Pajak', category: 'Liabilitas', normalBalance: 'K', isContra: false },
+  { code: '206', name: 'Pendapatan Diterima Dimuka', category: 'Liabilitas', normalBalance: 'K', isContra: false },
+  { code: '211', name: 'Utang Obligasi', category: 'Liabilitas', normalBalance: 'K', isContra: false },
+  { code: '212', name: 'Utang Bank Jangka Panjang', category: 'Liabilitas', normalBalance: 'K', isContra: false },
+  { code: '213', name: 'Utang Hipotek', category: 'Liabilitas', normalBalance: 'K', isContra: false },
+
+  // EKUITAS (3xx)
   { code: '301', name: 'Modal Pemilik', category: 'Ekuitas', normalBalance: 'K', isContra: false },
-  { code: '302', name: 'Prive Pemilik', category: 'Ekuitas', normalBalance: 'D', isContra: false }, // reduces equity, normal balance D
-  { code: '303', name: 'Ikhtisar Laba Rugi', category: 'Ekuitas', normalBalance: 'K', isContra: false },
-  // Pendapatan
+  { code: '302', name: 'Prive Pemilik', category: 'Ekuitas', normalBalance: 'D', isContra: false },
+  { code: '399', name: 'Ikhtisar Laba Rugi', category: 'Ekuitas', normalBalance: 'K', isContra: false },
+
+  // PENDAPATAN (4xx)
   { code: '401', name: 'Pendapatan Jasa', category: 'Pendapatan', normalBalance: 'K', isContra: false },
-  { code: '402', name: 'Pendapatan Penjualan', category: 'Pendapatan', normalBalance: 'K', isContra: false },
-  { code: '403', name: 'Pendapatan Lain-lain', category: 'Pendapatan', normalBalance: 'K', isContra: false },
-  // Beban
-  { code: '501', name: 'Beban Gaji', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '402', name: 'Pendapatan Usaha', category: 'Pendapatan', normalBalance: 'K', isContra: false },
+  { code: '403', name: 'Pendapatan Penjualan', category: 'Pendapatan', normalBalance: 'K', isContra: false },
+  { code: '404', name: 'Retur Penjualan (kontra, saldo debit)', category: 'Pendapatan', normalBalance: 'D', isContra: true },
+  { code: '405', name: 'Potongan Penjualan (kontra, saldo debit)', category: 'Pendapatan', normalBalance: 'D', isContra: true },
+  { code: '406', name: 'Pendapatan Bunga', category: 'Pendapatan', normalBalance: 'K', isContra: false },
+  { code: '407', name: 'Pendapatan Sewa', category: 'Pendapatan', normalBalance: 'K', isContra: false },
+  { code: '408', name: 'Pendapatan Lain-lain', category: 'Pendapatan', normalBalance: 'K', isContra: false },
+
+  // BEBAN (5xx)
+  { code: '501', name: 'Beban Gaji dan Upah', category: 'Beban', normalBalance: 'D', isContra: false },
   { code: '502', name: 'Beban Sewa', category: 'Beban', normalBalance: 'D', isContra: false },
-  { code: '503', name: 'Beban Perlengkapan', category: 'Beban', normalBalance: 'D', isContra: false },
-  { code: '504', name: 'Beban Penyusutan Peralatan', category: 'Beban', normalBalance: 'D', isContra: false },
-  { code: '505', name: 'Beban Penyusutan Gedung', category: 'Beban', normalBalance: 'D', isContra: false },
-  { code: '506', name: 'Beban Utilitas (Air/Listrik/Telp)', category: 'Beban', normalBalance: 'D', isContra: false },
-  { code: '507', name: 'Beban Bunga', category: 'Beban', normalBalance: 'D', isContra: false },
-  { code: '508', name: 'Beban Administrasi & Umum', category: 'Beban', normalBalance: 'D', isContra: false },
-  { code: '509', name: 'Beban Pokok Penjualan (HPP)', category: 'Beban', normalBalance: 'D', isContra: false }
+  { code: '503', name: 'Beban Listrik, Air, dan Telepon', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '504', name: 'Beban Perlengkapan', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '505', name: 'Beban Iklan', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '506', name: 'Beban Penyusutan Peralatan Kantor', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '507', name: 'Beban Penyusutan Gedung', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '508', name: 'Beban Penyusutan Kendaraan', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '509', name: 'Beban Asuransi', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '510', name: 'Beban Bunga', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '511', name: 'Harga Pokok Penjualan (HPP)', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '512', name: 'Beban Pembelian', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '513', name: 'Beban Angkut Pembelian', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '514', name: 'Beban Pajak', category: 'Beban', normalBalance: 'D', isContra: false },
+  { code: '515', name: 'Beban Lain-lain', category: 'Beban', normalBalance: 'D', isContra: false }
 ];
 
 export interface LedgerRow {
@@ -59,7 +87,7 @@ export interface LedgerAccountSummary {
 
 // Check if an account is a cash or bank account
 export function isCashAccount(code: string): boolean {
-  return code === '101' || code === '102';
+  return code === '101' || code === '102' || code === '103';
 }
 
 // Generate Ledgers for all Accounts
