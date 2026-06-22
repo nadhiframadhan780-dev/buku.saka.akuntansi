@@ -603,14 +603,24 @@ export default function App() {
         <div className="p-6 border-b border-white/10 dark:border-slate-800 flex items-center justify-between gap-1 lg:gap-2.5">
           <div className="md:hidden lg:block">
             <h1 className="text-xl font-bold tracking-tight uppercase flex items-center gap-2 text-white">
-              <span className="text-emerald-400 font-mono">◈</span> Buku Saka
+              <img
+                src="https://github.com/nadhiframadhan780-dev/appsmanegeri68jakarta/blob/main/NarKuntansi.png?raw=true"
+                alt="NarKuntansi Logo"
+                className="w-7 h-7 rounded-md object-cover"
+              />
+              NarKuntansi
             </h1>
             <p className="text-[10px] text-white/50 uppercase tracking-widest mt-1 font-mono">SAK EP Suite 2026</p>
-            <p className="text-[9px] text-emerald-300 font-mono mt-1 font-semibold tracking-wider">Karya: NADHIFNAR</p>
+            <p className="text-[9px] text-emerald-300 font-mono mt-1 font-semibold tracking-wider">By Nadhif Aulia R.</p>
           </div>
           
           <div className="hidden md:block lg:hidden text-center mx-auto">
-            <span className="text-xl font-bold text-emerald-400 font-mono" title="Buku Saka">◈</span>
+            <img
+              src="https://github.com/nadhiframadhan780-dev/appsmanegeri68jakarta/blob/main/NarKuntansi.png?raw=true"
+              alt="NarKuntansi Logo"
+              className="w-7 h-7 rounded-md object-cover mx-auto"
+              title="NarKuntansi"
+            />
           </div>
 
           <button
@@ -823,7 +833,7 @@ export default function App() {
               {activeTab === 'laporan' && `Laporan Keuangan Kelayakan — ${activeLaporanTab}`}
               {activeTab === 'coa' && 'Chart of Accounts'}
               {activeTab === 'calculators' && 'Simulasi Matematika Keuangan'}
-              {activeTab === 'settings' && 'Setelan Sistem Buku Saka'}
+              {activeTab === 'settings' && 'Setelan Sistem NarKuntansi'}
             </h2>
             <p className="text-xs text-slate-450 dark:text-slate-500 mt-1 uppercase tracking-wider font-semibold">
               {settings.companyName} &bull; Periode Laporan: {settings.period}
@@ -916,7 +926,7 @@ export default function App() {
                     <Award className="w-6 h-6 text-yellow-400" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-base text-slate-100">Buku Saka SAK EP Standardized</h3>
+                    <h3 className="font-extrabold text-base text-slate-100">NarKuntansi SAK EP Standardized</h3>
                     <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-3xl">
                       Selamat datang di sistem pembukuan akuntansi nirlaba dan komersial berbasis **Standard Akuntansi Keuangan Entitas Privat (SAK EP) 2025** yang menggantikan SAK ETAP. Di dalam sistem terintegrasi ini, semua jurnal Anda diproses secara real-time menjadi buku besar pembantu, neraca saldo berimbang dan 5 jenis laporan keuangan siap cetak.
                     </p>
@@ -2108,9 +2118,9 @@ export default function App() {
             </span>
           </div>
           <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono flex items-center gap-2">
-            <span>&copy; 2026 Buku Saka &bull; SAK-EP Compliance Engine</span>
+            <span>&copy; 2026 NarKuntansi &bull; SAK-EP Compliance Engine</span>
             <span className="h-3 w-px bg-slate-300 dark:bg-slate-800"></span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-sans">Pembuat: NADHIFNAR</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-sans">Pembuat: Nadhif Aulia R.</span>
           </div>
         </footer>
 
@@ -2175,7 +2185,7 @@ export default function App() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="font-sans font-black text-slate-800 dark:text-white text-sm uppercase tracking-wider">SIKLUS BUKU SAKA</h3>
-                  <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">Pembuat: <span className="font-extrabold text-blue-600">NADHIFNAR</span></p>
+                  <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">Pembuat: <span className="font-extrabold text-blue-600">Nadhif Aulia R.</span></p>
                 </div>
                 <button 
                   onClick={() => setShowMobileMore(false)}
