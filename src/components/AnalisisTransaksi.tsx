@@ -223,7 +223,7 @@ export default function AnalisisTransaksi({ transactions, accounts, onOpenTxDeta
                 Peringatan Anomali & Kesalahan SAK Terdeteksi ({anomalies.length})
               </h3>
               <p className="text-xs text-amber-700/90 dark:text-amber-400/80 leading-relaxed font-sans mb-3">
-                Sistem Buku Saka mendeteksi ketidaksesuaian akuntansi otomatis yang melanggar dasar pembukuan berpasangan atau SAK EP 2025:
+                Sistem NarKuntansi mendeteksi ketidaksesuaian akuntansi otomatis yang melanggar dasar pembukuan berpasangan atau SAK EP 2025:
               </p>
               <ul className="space-y-1.5 pl-5 list-disc text-xs font-mono">
                 {anomalies.map((msg, idx) => (
